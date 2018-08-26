@@ -1,3 +1,5 @@
+package com.github.anhphi257.old;
+
 import java.io.*;
 import java.nio.file.Paths;
 import java.security.SecureRandom;
