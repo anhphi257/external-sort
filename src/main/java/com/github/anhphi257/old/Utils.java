@@ -23,14 +23,17 @@ public class Utils {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(path)))) {
             while (currentSize < size) {
                 long len = random.nextLong() % maxLineLength;
-                if (len == 0) len++;
+                if (len <= 1) len = 2;
+
                 StringBuilder builder = new StringBuilder();
                 for (int i = 0; i < len; i++) {
                     int index = random.nextInt(charSet.length());
                     builder.append(charSet.charAt(index));
                 }
-                if(builder.toString().length() > 0)
-                writer.write(builder.toString() + "\n");
+                if (builder.toString().length() > 0) {
+                    writer.write(builder.toString());
+                    writer.newLine();
+                }
                 currentSize += builder.length() + 1;
             }
         }
