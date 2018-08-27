@@ -52,7 +52,7 @@ public class ExternalSort {
     }
 
     //2-passes merging
-    private void mergeSortedFiles(List<File> files, File output) {
+    private void mergeSortedFiles(List<File> files, File output) throws InterruptedException {
         System.out.println("Start merging");
         //first pass
 
@@ -62,7 +62,7 @@ public class ExternalSort {
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         List<Future> firstPassMergeFutures = new ArrayList<>();
         int fromIndex = 0;
-        while (fromIndex + batch < files.size()) {
+        while (fromIndex < files.size()) {
             int toIndex = Math.min(fromIndex + batch, files.size());
             File tmp = Paths.get("E:\\code", "tmp2", fromIndex + "-" + toIndex).toFile(); //TODO: implement output path
             Future<?> future = executor.submit(new Merger(files.subList(fromIndex, toIndex), tmp));
@@ -72,9 +72,11 @@ public class ExternalSort {
         }
         Helper.waitExecution(firstPassMergeFutures);
         //second pass
+        Thread.sleep(5000);
+        System.out.println("Second phase merging");
         ExecutorService secondPassMergeExecutor = Executors.newFixedThreadPool(1);
-        Future<?> secondPassFututre = secondPassMergeExecutor.submit(new Merger(firstPassMergeFiles, output));
-        Helper.waitExecution(secondPassFututre);
+        Future<?> secondPassFuture = secondPassMergeExecutor.submit(new Merger(firstPassMergeFiles, output));
+        Helper.waitExecution(secondPassFuture);
 
 
     }
@@ -148,7 +150,7 @@ public class ExternalSort {
                             e.printStackTrace();
                         }
                     }
-                    if (numFile.get() == 0) {
+                    if (readDone && numFile.get() == 0) {
                         return Boolean.TRUE;
                     }
                 }
@@ -158,7 +160,7 @@ public class ExternalSort {
         readDone = Helper.waitExecution(readerSubmit);
         Helper.waitExecution(sorterFutures);
 
-        System.out.println( fileReaderExecutor);
+        System.out.println(fileReaderExecutor);
         System.out.println(sorterPool.isShutdown());
 
         long end = System.currentTimeMillis();

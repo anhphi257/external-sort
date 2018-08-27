@@ -41,16 +41,14 @@ public class Merger implements Runnable {
                     queue.add(cache);
                 }
             }
+            writer.close();
             for (File file : files) {
                 file.delete();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
-
-
 }
 
 final class FileCache {
