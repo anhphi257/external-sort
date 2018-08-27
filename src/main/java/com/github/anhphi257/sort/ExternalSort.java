@@ -9,7 +9,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class ExternalSort {
@@ -64,7 +63,7 @@ public class ExternalSort {
         int fromIndex = 0;
         while (fromIndex < files.size()) {
             int toIndex = Math.min(fromIndex + batch, files.size());
-            File tmp = Paths.get("E:\\code", "tmp2", fromIndex + "-" + toIndex).toFile(); //TODO: implement output path
+            File tmp = Paths.get("..", "tmp2", fromIndex + "-" + toIndex).toFile(); //TODO: implement output path
             Future<?> future = executor.submit(new Merger(files.subList(fromIndex, toIndex), tmp));
             firstPassMergeFiles.add(tmp);
             firstPassMergeFutures.add(future);
@@ -78,7 +77,6 @@ public class ExternalSort {
         Future<?> secondPassFuture = secondPassMergeExecutor.submit(new Merger(firstPassMergeFiles, output));
         Helper.waitExecution(secondPassFuture);
 
-
     }
 
 
@@ -87,9 +85,9 @@ public class ExternalSort {
         AtomicInteger numFile = new AtomicInteger();
         String tmpDir = Helper.createTemperaryDirectory();
         List<File> files = new ArrayList<>();
-        ExecutorService fileReaderExecutor = Executors.newFixedThreadPool(1);
+        ExecutorService readerPool = Executors.newFixedThreadPool(1);
 
-        Future<Boolean> readerSubmit = fileReaderExecutor.submit(() -> {
+        Future<Boolean> readerFuture = readerPool.submit(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(input), DEFAULT_CHARSET))) {
                 List<String> lines = new ArrayList<>();
                 long currentSize = 0;
@@ -157,24 +155,14 @@ public class ExternalSort {
             }));
         }
 
-        readDone = Helper.waitExecution(readerSubmit);
+        readDone = Helper.waitExecution(readerFuture);
         Helper.waitExecution(sorterFutures);
-
-        System.out.println(fileReaderExecutor);
-        System.out.println(sorterPool.isShutdown());
 
         long end = System.currentTimeMillis();
         System.out.println("Split and sort in: " + (end - start) + " ms");
         return files;
     }
 
-    private class Sorter implements Runnable {
-
-        @Override
-        public void run() {
-
-        }
-    }
 
     private static class Helper {
 

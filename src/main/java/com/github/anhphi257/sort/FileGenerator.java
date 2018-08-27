@@ -1,10 +1,10 @@
-package com.github.anhphi257.old;
+package com.github.anhphi257.sort;
 
 import java.io.*;
 import java.nio.file.Paths;
 import java.security.SecureRandom;
 
-public class Utils {
+public class FileGenerator {
     public static String DATA_DIR = "data";
     public static String charSet = "abcdefghijklmnopqrstuvwxyz0123456789";
 

@@ -21,10 +21,7 @@ public class Merger implements Runnable {
 
     @Override
     public void run() {
-        BufferedWriter writer = null;
-        try {
-            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile),
-                    Charset.forName("UTF-8")));
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile), Charset.forName("UTF-8")))) {
             PriorityQueue<FileCache> queue = new PriorityQueue<>(Comparator.comparing(FileCache::peek));
             for (File file : files) {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), Charset.forName("UTF-8")));
@@ -41,13 +38,13 @@ public class Merger implements Runnable {
                     queue.add(cache);
                 }
             }
-            writer.close();
-            for (File file : files) {
-                file.delete();
-            }
         } catch (IOException e) {
             e.printStackTrace();
         }
+        for (File file : files) {
+            file.delete();
+        }
+        System.out.println("Merge done");
     }
 }
 
