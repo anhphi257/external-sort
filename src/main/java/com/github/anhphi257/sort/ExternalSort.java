@@ -124,7 +124,7 @@ public class ExternalSort {
         ExecutorService sorterPool = Executors.newFixedThreadPool(this.numThreads);
         for (int i = 0; i < numThreads; i++) {
             sorterFutures.add(sorterPool.submit(() -> {
-                while (!readDone || numFile.get() > 0) {
+                while (true) {
                     List<String> lines;
                     lines = queue.take();
                     lines = lines.parallelStream().sorted(DEFAULT_COMPARATOR).collect(Collectors.toList());
@@ -138,7 +138,9 @@ public class ExternalSort {
                         }
                         System.gc();
                         files.add(file);
-                        numFile.decrementAndGet();
+                        if (numFile.decrementAndGet() == 0) {
+                            break;
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -154,6 +156,14 @@ public class ExternalSort {
         long end = System.currentTimeMillis();
         System.out.println("Split and sort in: " + (end - start) + " ms");
         return files;
+    }
+
+    private class Sorter implements Runnable {
+
+        @Override
+        public void run() {
+
+        }
     }
 
     private static class Helper {
