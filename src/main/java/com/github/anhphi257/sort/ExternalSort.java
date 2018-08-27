@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class ExternalSort {
@@ -18,6 +19,7 @@ public class ExternalSort {
     private boolean readDone;
     private BlockingQueue<List<String>> queue;
 
+
     public ExternalSort() {
         new ExternalSort(1);
     }
@@ -25,7 +27,7 @@ public class ExternalSort {
     public ExternalSort(int numThreads) {
         this.numThreads = numThreads;
         this.blockSize = estimasteBlockSize();
-        this.queue = new ArrayBlockingQueue<>(2);
+        this.queue = new ArrayBlockingQueue<>(4);
         System.out.println("Number threads: " + this.numThreads);
         System.out.println("Block size: " + this.blockSize);
     }
@@ -36,7 +38,7 @@ public class ExternalSort {
         long usedMem = r.totalMemory() - r.freeMemory();
         long freeMem = r.maxMemory() - usedMem;
         System.out.println("Free mem: " + freeMem);
-        return freeMem / (numThreads * 4 + 1);
+        return freeMem / (numThreads * 16 + 1);
     }
 
     public void sort(String input, String output) throws IOException, ExecutionException, InterruptedException {
@@ -45,21 +47,23 @@ public class ExternalSort {
 
     public void sort(File input, File output) throws IOException, ExecutionException, InterruptedException {
         List<File> files = splitAndSort(input);
-//        mergeSortedFiles(files, output);
+        mergeSortedFiles(files, output);
     }
 
     //2-passes merging
     private void mergeSortedFiles(List<File> files, File output) {
+        System.out.println("Start merging");
         //first pass
 
         List<File> firstPassMergeFiles = new ArrayList<>();
         int batch = (int) Math.sqrt(files.size());
+        System.out.println("First phase with batch: " + batch);
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         List<Future> firstPassMergeFutures = new ArrayList<>();
         int fromIndex = 0;
         while (fromIndex + batch < files.size()) {
             int toIndex = Math.min(fromIndex + batch, files.size());
-            File tmp = Paths.get("abc", "def", fromIndex + "-" + toIndex).toFile(); //TODO: implement output path
+            File tmp = Paths.get("E:\\code", "tmp2", fromIndex + "-" + toIndex).toFile(); //TODO: implement output path
             Future<?> future = executor.submit(new Merger(files.subList(fromIndex, toIndex), tmp));
             firstPassMergeFiles.add(tmp);
             firstPassMergeFutures.add(future);
@@ -78,7 +82,7 @@ public class ExternalSort {
 
     private List<File> splitAndSort(File input) throws IOException, InterruptedException, ExecutionException {
         long start = System.currentTimeMillis();
-
+        AtomicInteger numFile = new AtomicInteger();
         String tmpDir = Helper.createTemperaryDirectory();
         List<File> files = new ArrayList<>();
         ExecutorService fileReaderExecutor = Executors.newFixedThreadPool(1);
@@ -87,9 +91,7 @@ public class ExternalSort {
                 List<String> lines = new ArrayList<>();
                 long currentSize = 0;
                 String line;
-                int index = 0;
                 while ((line = reader.readLine()) != null) {
-                    index ++;
                     int length = line.getBytes(DEFAULT_CHARSET).length;
                     if (length + currentSize < blockSize) {
                         lines.add(line);
@@ -99,7 +101,7 @@ public class ExternalSort {
                         System.out.println("Add to queue " + lines.size() + " lines");
                         System.out.println(runtime.totalMemory() - runtime.freeMemory());
                         queue.put(lines);
-                        System.out.println("queue size after put: " + queue.size());
+                        numFile.incrementAndGet();
                         lines = new ArrayList<>();
                         System.gc();
                         lines.add(line);
@@ -109,22 +111,22 @@ public class ExternalSort {
 
                 if (lines.size() > 0) {
                     queue.put(lines);
+                    numFile.incrementAndGet();
                     System.gc();
+
                 }
             }
             return Boolean.TRUE;
         });
 
-        fileReaderExecutor.shutdown();
 
         List<Future> sorterFutures = new ArrayList<>();
         ExecutorService sorterPool = Executors.newFixedThreadPool(this.numThreads);
         for (int i = 0; i < numThreads; i++) {
             sorterFutures.add(sorterPool.submit(() -> {
-                while (!readDone) {
+                while (!readDone || numFile.get() > 0) {
                     List<String> lines;
                     lines = queue.take();
-                    System.out.println("Take : " + lines.size() + " lines");
                     lines = lines.parallelStream().sorted(DEFAULT_COMPARATOR).collect(Collectors.toList());
                     File file = Paths.get(tmpDir, input.getName() + "-" + System.currentTimeMillis()).toFile();
                     System.out.println("Start sorting and writing to file: " + file.getName());
@@ -134,9 +136,9 @@ public class ExternalSort {
                             writer.write(line);
                             writer.newLine();
                         }
-                        System.out.println("write done");
                         System.gc();
                         files.add(file);
+                        numFile.decrementAndGet();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -144,9 +146,11 @@ public class ExternalSort {
                 return Boolean.TRUE;
             }));
         }
-        sorterPool.shutdown();
+
         readDone = Helper.waitExecution(readerSubmit);
         Helper.waitExecution(sorterFutures);
+
+
         long end = System.currentTimeMillis();
         System.out.println("Split and sort in: " + (end - start) + " ms");
         return files;
@@ -155,7 +159,7 @@ public class ExternalSort {
     private static class Helper {
 
         public static String createTemperaryDirectory() {
-            String dirPath = Paths.get("/home/phiha/workspace/code/data/", "tmp").toString();
+            String dirPath = Paths.get("E:\\code", "tmp").toString();
             File file = new File(dirPath);
             if (file.exists()) {
                 if (file.isDirectory()) {
