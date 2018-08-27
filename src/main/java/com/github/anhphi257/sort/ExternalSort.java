@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class ExternalSort {
@@ -69,7 +70,6 @@ public class ExternalSort {
             firstPassMergeFutures.add(future);
             fromIndex = toIndex;
         }
-        executor.shutdown();
         Helper.waitExecution(firstPassMergeFutures);
         //second pass
         ExecutorService secondPassMergeExecutor = Executors.newFixedThreadPool(1);
@@ -86,6 +86,7 @@ public class ExternalSort {
         String tmpDir = Helper.createTemperaryDirectory();
         List<File> files = new ArrayList<>();
         ExecutorService fileReaderExecutor = Executors.newFixedThreadPool(1);
+
         Future<Boolean> readerSubmit = fileReaderExecutor.submit(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(input), DEFAULT_CHARSET))) {
                 List<String> lines = new ArrayList<>();
@@ -105,7 +106,7 @@ public class ExternalSort {
                         lines = new ArrayList<>();
                         System.gc();
                         lines.add(line);
-                        currentSize = 0;
+                        currentSize = length;
                     }
                 }
 
@@ -119,30 +120,33 @@ public class ExternalSort {
             return Boolean.TRUE;
         });
 
-
+        AtomicInteger fileIndex = new AtomicInteger(0);
         List<Future> sorterFutures = new ArrayList<>();
         ExecutorService sorterPool = Executors.newFixedThreadPool(this.numThreads);
         for (int i = 0; i < numThreads; i++) {
             sorterFutures.add(sorterPool.submit(() -> {
                 while (true) {
                     List<String> lines;
-                    lines = queue.take();
-                    lines = lines.parallelStream().sorted(DEFAULT_COMPARATOR).collect(Collectors.toList());
-                    File file = Paths.get(tmpDir, input.getName() + "-" + System.currentTimeMillis()).toFile();
-                    System.out.println("Start sorting and writing to file: " + file.getName());
-                    try (BufferedWriter writer = new BufferedWriter(
-                            new OutputStreamWriter(new FileOutputStream(file, false), DEFAULT_CHARSET))) {
-                        for (String line : lines) {
-                            writer.write(line);
-                            writer.newLine();
+                    lines = queue.poll(50l, TimeUnit.MILLISECONDS);
+                    if (lines != null) {
+                        lines = lines.parallelStream().sorted(DEFAULT_COMPARATOR).collect(Collectors.toList());
+                        File file = Paths.get(tmpDir, input.getName() + "-" + fileIndex.getAndIncrement()).toFile();
+                        System.out.println("Start sorting and writing to file: " + file.getName());
+                        try (BufferedWriter writer = new BufferedWriter(
+                                new OutputStreamWriter(new FileOutputStream(file, false), DEFAULT_CHARSET))) {
+                            for (String line : lines) {
+                                writer.write(line);
+                                writer.newLine();
+                            }
+                            System.gc();
+                            files.add(file);
+                            System.out.println("Write done. Current queue size: " + queue.size());
+                            if (numFile.decrementAndGet() == 0) {
+                                break;
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
                         }
-                        System.gc();
-                        files.add(file);
-                        if (numFile.decrementAndGet() == 0) {
-                            break;
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
                     }
                 }
                 return Boolean.TRUE;
