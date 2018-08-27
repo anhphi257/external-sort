@@ -140,6 +140,7 @@ public class ExternalSort {
                                 writer.write(line);
                                 writer.newLine();
                             }
+                            numFile.decrementAndGet();
                             System.gc();
                             files.add(file);
                             System.out.println("Write done. Current queue size: " + queue.size());
@@ -147,7 +148,7 @@ public class ExternalSort {
                             e.printStackTrace();
                         }
                     }
-                    if (numFile.decrementAndGet() == 0) {
+                    if (numFile.get() == 0) {
                         return Boolean.TRUE;
                     }
                 }
