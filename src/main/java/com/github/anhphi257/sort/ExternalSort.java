@@ -80,6 +80,7 @@ public class ExternalSort {
 //                    sortAndSave(lines, f);
                     files.add(f);
                     index++;
+                    lines.clear();
                     lines = new ArrayList<>();
                     lines.add(line);
                     currentSize = 0;
