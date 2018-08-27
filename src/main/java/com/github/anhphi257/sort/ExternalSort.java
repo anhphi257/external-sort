@@ -117,6 +117,8 @@ public class ExternalSort {
 
                 }
             }
+            System.out.println("READ DONE");
+
             return Boolean.TRUE;
         });
 
@@ -141,21 +143,22 @@ public class ExternalSort {
                             System.gc();
                             files.add(file);
                             System.out.println("Write done. Current queue size: " + queue.size());
-                            if (numFile.decrementAndGet() == 0) {
-                                break;
-                            }
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
                     }
+                    if (numFile.decrementAndGet() == 0) {
+                        return Boolean.TRUE;
+                    }
                 }
-                return Boolean.TRUE;
             }));
         }
 
         readDone = Helper.waitExecution(readerSubmit);
         Helper.waitExecution(sorterFutures);
 
+        System.out.println( fileReaderExecutor);
+        System.out.println(sorterPool.isShutdown());
 
         long end = System.currentTimeMillis();
         System.out.println("Split and sort in: " + (end - start) + " ms");
