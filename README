@@ -1,0 +1,12 @@
+External merge sorting: https://en.wikipedia.org/wiki/External_sorting
+
+
+
+To run the sort:
+* mvn clean package
+* cd target
+* java -Xmx<MEM> -cp external-sort-1.0-SNAPSHOT.jar com.github.anhphi257.sort.ExternalSort <input> <output> <numThread>
+
+For example:
+    java -Xmx8G -cp external-sort-1.0-SNAPSHOT.jar com.github.anhphi257.sort.ExternalSort input.txt output.txt 8
+
